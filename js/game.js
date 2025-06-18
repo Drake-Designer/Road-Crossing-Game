@@ -1,9 +1,12 @@
+<<<<<<< HEAD
 let background;
 let player;
 let dragon;
 let treasure;
 
 // Create a new scene
+=======
+>>>>>>> 5a84bd069f913caea69061891a0bc5d366e040df
 let gameScene = new Phaser.Scene('Game');
 
 gameScene.preload = function () {
@@ -13,6 +16,7 @@ gameScene.preload = function () {
   this.load.image('treasure', 'assets/treasure.png');
 };
 
+<<<<<<< HEAD
 gameScene.create = function () {
   background = this.add.image(0, 0, 'background').setOrigin(0, 0);
   player = this.add.sprite(70, 180, 'player');
@@ -21,6 +25,8 @@ gameScene.create = function () {
   treasure.setScale(0.6);
 };
 
+=======
+>>>>>>> 5a84bd069f913caea69061891a0bc5d366e040df
 let config = {
   type: Phaser.AUTO,
   width: 640,
