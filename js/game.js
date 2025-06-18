@@ -63,9 +63,14 @@ function grow(item) {
 
 let config = {
   type: Phaser.AUTO,
-  width: 640,
-  height: 360,
+  parent: 'game-container',
   scene: gameScene,
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: 640,
+    height: 360,
+  },
 };
 
 // Create a new game and pass the configuration
