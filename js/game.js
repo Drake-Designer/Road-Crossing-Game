@@ -4,23 +4,77 @@ let player;
 let dragon;
 let treasure;
 
-// Create a new scene
+// Title Scene
+let titleScene = new Phaser.Scene('Title');
+titleScene.preload = function () {
+  this.load.image('titlebackground', 'assets/title-background.png');
+};
+
+titleScene.create = function () {
+  let backgr = this.add.sprite(0, 0, 'titlebackground');
+  backgr.setOrigin(0, 0);
+
+  let text = this.add.text(100, 100, 'Welcome to my Game\n(Tap or Click to Start!)', {
+    fontSize: '32px',
+    fill: '#fff',
+    stroke: '#000',
+    strokeThickness: 4,
+  });
+
+  this.input.on(
+    'pointerup',
+    function () {
+      this.scene.start('Game');
+    },
+    this
+  );
+};
+
+// Win Scene
+let winScene = new Phaser.Scene('Win');
+
+winScene.create = function () {
+  this.cameras.main.setBackgroundColor('#222');
+
+  const message = 'You win!\n(Tap or Click to Restart)';
+  const { width, height } = this.sys.game.config;
+
+  let text = this.add.text(width / 2, height / 2, message, {
+    fontFamily: 'monospace',
+    fontSize: '32px',
+    fill: '#fff',
+    stroke: '#000',
+    strokeThickness: 5,
+    align: 'center',
+    wordWrap: { width: width - 60 },
+  });
+  text.setOrigin(0.5, 0.5);
+
+  // Restart on click/tap
+  this.input.on(
+    'pointerup',
+    function () {
+      this.scene.start('Game');
+    },
+    this
+  );
+};
+
+// Game Scene
 let gameScene = new Phaser.Scene('Game');
 
 // Initiate
 gameScene.init = function () {
   // Player speed
   this.playerSpeed = 1;
-
   // Enemy speed
-  this.dragonMinSpeed = 0.4;
-  this.dragonMaxSpeed = 1.5;
-
+  this.dragonMinSpeed = 0.2;
+  this.dragonMaxSpeed = 2;
   // Boundaries
   this.dragonMinY = 80;
   this.dragonMaxY = 280;
-
   this.isTerminating = false;
+  this.playerMoving = false;
 };
 
 // Preload
@@ -33,6 +87,8 @@ gameScene.preload = function () {
 
 // Create
 gameScene.create = function () {
+  this.isTerminating = false;
+
   // Game background
   background = this.add.image(0, 0, 'background');
   background.setOrigin(0, 0);
@@ -62,10 +118,7 @@ gameScene.create = function () {
   Phaser.Actions.Call(
     this.dragons.getChildren(),
     function (dragon) {
-      // Flip dragon
       dragon.flipX = true;
-
-      // Set speed
       let dir = Math.random() < 0.5 ? 1 : -1;
       let speed = this.dragonMinSpeed + Math.random() * (this.dragonMaxSpeed - this.dragonMinSpeed);
       dragon.speed = dir * speed;
@@ -76,20 +129,58 @@ gameScene.create = function () {
   // Treasure
   treasure = this.add.sprite(this.sys.game.config.width - 80, this.sys.game.config.height / 2, 'treasure');
   treasure.setScale(0.6);
+
+  // Disabling click out of the phaser window
+  this.input.on(
+    'pointerdown',
+    function () {
+      this.playerMoving = true;
+    },
+    this
+  );
+
+  this.input.on(
+    'pointerup',
+    function () {
+      this.playerMoving = false;
+    },
+    this
+  );
+
+  this.input.on(
+    'pointerout',
+    function () {
+      this.playerMoving = false;
+    },
+    this
+  );
 };
 
 // Update
 gameScene.update = function () {
   if (this.isTerminating) return;
 
-  // Move the player
-  if (this.input.activePointer.isDown) {
+  if (this.playerMoving) {
     player.x += this.playerSpeed;
   }
 
   // Treasure overlap check
   let playerRect = player.getBounds();
   let treasureRect = treasure.getBounds();
+
+  if (Phaser.Geom.Intersects.RectangleToRectangle(playerRect, treasureRect)) {
+    this.isTerminating = true;
+    this.cameras.main.fade(500);
+
+    this.cameras.main.once(
+      'camerafadeoutcomplete',
+      function () {
+        this.scene.start('Win');
+      },
+      this
+    );
+    return;
+  }
 
   // Get enemies
   let dragons = this.dragons.getChildren();
@@ -110,60 +201,46 @@ gameScene.update = function () {
     // Check dragon overlap
     let dragonRect = dragons[i].getBounds();
 
-    // Restart scene
     if (Phaser.Geom.Intersects.RectangleToRectangle(playerRect, dragonRect)) {
-      return this.gameOver();
+      this.gameOver();
+      return;
     }
   }
-
-  gameScene.gameOver = function () {
-    this.isTerminating = true;
-
-    // Shake camera
-    this.cameras.main.shake(500);
-
-    //End shaking camera, restart the game
-    this.cameras.main.on(
-      'camerashakecomplete',
-      function (camera, effect) {
-        // Fade out
-        this.cameras.main.fade(500);
-      },
-      this
-    );
-
-    this.cameras.main.on(
-      'camerafadeoutcomplete',
-      function (camera, effect) {
-        // Restart game
-        this.scene.restart();
-      },
-      this
-    );
-
-    this.cameras.main.fade(500);
-    return;
-  };
 };
 
-// Utility function (not used here but left as is)
-function grow(item) {
-  if (item.scaleX < 2 && item.scaleY < 2) {
-    item.setScale(item.scaleX + 0.001, item.scaleY + 0.001);
-  }
-}
+gameScene.gameOver = function () {
+  this.isTerminating = true;
+
+  this.cameras.main.shake(500);
+
+  this.cameras.main.once(
+    'camerashakecomplete',
+    function () {
+      this.cameras.main.fade(500);
+    },
+    this
+  );
+
+  this.cameras.main.once(
+    'camerafadeoutcomplete',
+    function () {
+      this.scene.restart();
+    },
+    this
+  );
+};
 
 // Set the configuration of the game
 let config = {
   type: Phaser.AUTO,
   parent: 'game-container',
-  scene: gameScene,
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width: 640,
     height: 360,
   },
+  scene: [titleScene, gameScene, winScene],
 };
 
 // Create a new game and pass the configuration
