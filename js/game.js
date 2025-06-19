@@ -13,12 +13,14 @@ gameScene.init = function () {
   this.playerSpeed = 1;
 
   // Enemy speed
-  this.dragonMinSpeed = 1;
-  this.dragonMaxSpeed = 4;
+  this.dragonMinSpeed = 0.4;
+  this.dragonMaxSpeed = 1.5;
 
   // Boundaries
   this.dragonMinY = 80;
   this.dragonMaxY = 280;
+
+  this.isTerminating = false;
 };
 
 // Preload
@@ -36,49 +38,112 @@ gameScene.create = function () {
   background.setOrigin(0, 0);
 
   // Player
-  player = this.add.sprite(70, 180, 'player');
-  player.setScale(0.6);
+  player = this.add.sprite(40, this.sys.game.config.height / 2, 'player');
+  player.setScale(0.5);
 
-  // Enemy (dragon)
-  dragon = this.add.sprite(250, 180, 'dragon');
-  dragon.flipX = true;
-  dragon.setScale(0.6);
+  // Enemy (dragons)
+  this.dragons = this.add.group({
+    key: 'dragon',
+    repeat: 5,
+    setXY: {
+      x: 90,
+      y: 100,
+      stepX: 80,
+      stepY: 20,
+    },
+  });
+
+  // Set scale for each dragon
+  this.dragons.children.iterate(function (dragon) {
+    dragon.setScale(0.4);
+  });
+
+  // Set flipX and speed
+  Phaser.Actions.Call(
+    this.dragons.getChildren(),
+    function (dragon) {
+      // Flip dragon
+      dragon.flipX = true;
+
+      // Set speed
+      let dir = Math.random() < 0.5 ? 1 : -1;
+      let speed = this.dragonMinSpeed + Math.random() * (this.dragonMaxSpeed - this.dragonMinSpeed);
+      dragon.speed = dir * speed;
+    },
+    this
+  );
 
   // Treasure
   treasure = this.add.sprite(this.sys.game.config.width - 80, this.sys.game.config.height / 2, 'treasure');
   treasure.setScale(0.6);
-
-  // Set enemy speed
-  let dir = Math.random() < 0.5 ? 1 : -1;
-  let speed = this.dragonMinSpeed + Math.random() * (this.dragonMaxSpeed - this.dragonMinSpeed);
-  dragon.speed = dir * speed;
 };
 
 // Update
 gameScene.update = function () {
+  if (this.isTerminating) return;
+
   // Move the player
   if (this.input.activePointer.isDown) {
     player.x += this.playerSpeed;
   }
 
-  // Treasure collection
+  // Treasure overlap check
   let playerRect = player.getBounds();
   let treasureRect = treasure.getBounds();
 
-  if (Phaser.Geom.Intersects.RectangleToRectangle(playerRect, treasureRect)) {
-    this.scene.restart(); // Restart scene if player reaches the treasure
+  // Get enemies
+  let dragons = this.dragons.getChildren();
+  let numDragons = dragons.length;
+
+  for (let i = 0; i < numDragons; i++) {
+    // Enemy (dragon) movement
+    dragons[i].y += dragons[i].speed;
+
+    // Check dragon boundaries
+    let conditionGoingUp = dragons[i].speed < 0 && dragons[i].y <= this.dragonMinY;
+    let conditionGoingDown = dragons[i].speed > 0 && dragons[i].y >= this.dragonMaxY;
+
+    if (conditionGoingUp || conditionGoingDown) {
+      dragons[i].speed *= -1;
+    }
+
+    // Check dragon overlap
+    let dragonRect = dragons[i].getBounds();
+
+    // Restart scene
+    if (Phaser.Geom.Intersects.RectangleToRectangle(playerRect, dragonRect)) {
+      return this.gameOver();
+    }
   }
 
-  // Enemy (dragon) movement
-  dragon.y += dragon.speed;
+  gameScene.gameOver = function () {
+    this.isTerminating = true;
 
-  // Check dragon boundaries
-  let conditionGoingUp = dragon.speed < 0 && dragon.y <= this.dragonMinY;
-  let conditionGoingDown = dragon.speed > 0 && dragon.y >= this.dragonMaxY;
+    // Shake camera
+    this.cameras.main.shake(500);
 
-  if (conditionGoingUp || conditionGoingDown) {
-    dragon.speed *= -1;
-  }
+    //End shaking camera, restart the game
+    this.cameras.main.on(
+      'camerashakecomplete',
+      function (camera, effect) {
+        // Fade out
+        this.cameras.main.fade(500);
+      },
+      this
+    );
+
+    this.cameras.main.on(
+      'camerafadeoutcomplete',
+      function (camera, effect) {
+        // Restart game
+        this.scene.restart();
+      },
+      this
+    );
+
+    this.cameras.main.fade(500);
+    return;
+  };
 };
 
 // Utility function (not used here but left as is)
